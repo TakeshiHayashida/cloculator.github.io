@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="ja" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>時間計算機</title>
+  <script src="/_sdk/element_sdk.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      box-sizing: border-box;
+    }
+  </style>
+  <style>@view-transition { navigation: auto; }</style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+ </head>
+ <body class="h-full">
+  <div id="app" class="w-full h-full overflow-auto flex items-center justify-center p-4">
+   <div class="w-full max-w-md">
+    <h1 id="title" class="text-center mb-6">時間計算機</h1>
+    <div class="rounded-2xl shadow-2xl p-6"><!-- ディスプレイ -->
+     <div id="display" class="mb-4 p-4 rounded-lg">
+      <div class="text-sm opacity-70 mb-1"><span id="displayMode">開始時刻</span>
+      </div>
+      <div id="displayTime" class="text-4xl font-bold text-right font-mono">
+       --:--
+      </div>
+     </div><!-- 結果表示エリア -->
+     <div id="resultSection" class="result-box rounded-lg p-3 mb-4 text-center" style="display: none;">
+      <div class="text-sm opacity-80">
+       経過時間
+      </div>
+      <div id="resultValue" class="text-2xl font-bold"></div>
+     </div><!-- ボタングリッド -->
+     <div class="grid grid-cols-3 gap-3"><!-- 数字ボタン --> <button class="calc-btn number-btn p-4 rounded-lg text-xl font-semibold transition-all" onclick="inputNumber('7')">7</button> <button class="calc-btn number-btn p-4 rounded-lg text-xl font-semibold transition-all" onclick="inputNumber('8')">8</button> <button class="calc-btn number-btn p-4 rounded-lg text-xl font-semibold transition-all" onclick="inputNumber('9')">9</button> <button class="calc-btn number-btn p-4 rounded-lg text-xl font-semibold transition-all" onclick="inputNumber('4')">4</button> <button class="calc-btn number-btn p-4 rounded-lg text-xl font-semibold transition-all" onclick="inputNumber('5')">5</button> <button class="calc-btn number-btn p-4 rounded-lg text-xl font-semibold transition-all" onclick="inputNumber('6')">6</button> <button class="calc-btn number-btn p-4 rounded-lg text-xl font-semibold transition-all" onclick="inputNumber('1')">1</button> <button class="calc-btn number-btn p-4 rounded-lg text-xl font-semibold transition-all" onclick="inputNumber('2')">2</button> <button class="calc-btn number-btn p-4 rounded-lg text-xl font-semibold transition-all" onclick="inputNumber('3')">3</button> <button class="calc-btn special-btn p-4 rounded-lg text-xl font-semibold transition-all" onclick="clearAll()">AC</button> <button class="calc-btn number-btn p-4 rounded-lg text-xl font-semibold transition-all" onclick="inputNumber('0')">0</button> <button class="calc-btn special-btn p-4 rounded-lg text-xl font-semibold transition-all" onclick="deleteDigit()">⌫</button> <!-- 機能ボタン --> <button id="switchBtn" class="calc-btn operator-btn col-span-2 p-4 rounded-lg text-lg font-semibold transition-all" onclick="switchMode()">終了時刻へ</button> <button id="calculateBtn" class="calc-btn equals-btn p-4 rounded-lg text-lg font-semibold transition-all" onclick="calculateTime()">=</button>
+     </div>
+    </div>
+   </div>
+  </div>
+  <script>
+    const defaultConfig = {
+      app_title: "時間計算機",
+      background_color: "#1e293b",
+      calculator_surface_color: "#334155",
+      display_color: "#0f172a",
+      display_text_color: "#f1f5f9",
+      number_button_color: "#475569",
+      number_button_text_color: "#f1f5f9",
+      operator_button_color: "#f97316",
+      operator_button_text_color: "#ffffff",
+      special_button_color: "#64748b",
+      special_button_text_color: "#f1f5f9",
+      equals_button_color: "#10b981",
+      equals_button_text_color: "#ffffff",
+      title_text_color: "#f1f5f9",
+      font_family: "system-ui",
+      font_size: 18
+    };
+
+    let currentInput = '';
+    let mode = 'start'; // 'start' or 'end'
+    let startTime = { hour: null, minute: null };
+    let endTime = { hour: null, minute: null };
+
+    function updateDisplay() {
+      const displayTime = document.getElementById('displayTime');
+      const displayMode = document.getElementById('displayMode');
+      
+      if (mode === 'start') {
+        displayMode.textContent = '開始時刻';
+        if (startTime.hour !== null && startTime.minute !== null) {
+          const hour = String(startTime.hour).padStart(2, '0');
+          const minute = String(startTime.minute).padStart(2, '0');
+          displayTime.textContent = `${hour}:${minute}`;
+        } else if (currentInput.length > 0) {
+          // 入力中の表示
+          const padded = currentInput.padEnd(4, '-');
+          displayTime.textContent = `${padded.substring(0, 2)}:${padded.substring(2, 4)}`;
+        } else {
+          displayTime.textContent = '--:--';
+        }
+      } else {
+        displayMode.textContent = '終了時刻';
+        if (endTime.hour !== null && endTime.minute !== null) {
+          const hour = String(endTime.hour).padStart(2, '0');
+          const minute = String(endTime.minute).padStart(2, '0');
+          displayTime.textContent = `${hour}:${minute}`;
+        } else if (currentInput.length > 0) {
+          // 入力中の表示
+          const padded = currentInput.padEnd(4, '-');
+          displayTime.textContent = `${padded.substring(0, 2)}:${padded.substring(2, 4)}`;
+        } else {
+          displayTime.textContent = '--:--';
+        }
+      }
+    }
+
+    function inputNumber(num) {
+      if (currentInput.length < 4) {
+        const testInput = currentInput + num;
+        
+        // 3桁目（分の十の位）が6以上なら入力を拒否
+        if (testInput.length === 3 && parseInt(testInput[2]) >= 6) {
+          return;
+        }
+        
+        currentInput += num;
+        
+        // 4桁入力完了時に自動的に時刻を設定
+        if (currentInput.length === 4) {
+          const hour = parseInt(currentInput.substring(0, 2));
+          const minute = parseInt(currentInput.substring(2, 4));
+          
+          if (hour <= 23 && minute <= 59) {
+            if (mode === 'start') {
+              startTime.hour = hour;
+              startTime.minute = minute;
+            } else {
+              endTime.hour = hour;
+              endTime.minute = minute;
+            }
+            currentInput = '';
+          }
+        }
+        
+        updateDisplay();
+      }
+    }
+
+    function deleteDigit() {
+      if (currentInput.length > 0) {
+        currentInput = currentInput.slice(0, -1);
+      } else {
+        if (mode === 'start') {
+          if (startTime.minute !== null) {
+            startTime.minute = null;
+          } else if (startTime.hour !== null) {
+            startTime.hour = null;
+          }
+        } else {
+          if (endTime.minute !== null) {
+            endTime.minute = null;
+          } else if (endTime.hour !== null) {
+            endTime.hour = null;
+          }
+        }
+      }
+      updateDisplay();
+    }
+
+    function clearAll() {
+      currentInput = '';
+      startTime = { hour: null, minute: null };
+      endTime = { hour: null, minute: null };
+      mode = 'start';
+      document.getElementById('resultSection').style.display = 'none';
+      document.getElementById('switchBtn').textContent = '終了時刻へ';
+      updateDisplay();
+    }
+
+    function switchMode() {
+      if (mode === 'start') {
+        mode = 'end';
+        document.getElementById('switchBtn').textContent = '開始時刻へ';
+      } else {
+        mode = 'start';
+        document.getElementById('switchBtn').textContent = '終了時刻へ';
+      }
+      currentInput = '';
+      updateDisplay();
+    }
+
+    function calculateTime() {
+      if (startTime.hour === null || startTime.minute === null || 
+          endTime.hour === null || endTime.minute === null) {
+        return;
+      }
+
+      // 分に変換
+      let startTotal = startTime.hour * 60 + startTime.minute;
+      let endTotal = endTime.hour * 60 + endTime.minute;
+
+      // 日をまたぐ場合の処理
+      if (endTotal < startTotal) {
+        endTotal += 24 * 60;
+      }
+
+      const diffMinutes = endTotal - startTotal;
+      const hours = Math.floor(diffMinutes / 60);
+      const minutes = diffMinutes % 60;
+
+      // 結果表示
+      const resultSection = document.getElementById('resultSection');
+      const resultValue = document.getElementById('resultValue');
+      
+      if (hours > 0 && minutes > 0) {
+        resultValue.textContent = `${hours}時間${minutes}分`;
+      } else if (hours > 0) {
+        resultValue.textContent = `${hours}時間`;
+      } else {
+        resultValue.textContent = `${minutes}分`;
+      }
+      
+      resultSection.style.display = 'block';
+    }
+
+    async function onConfigChange(config) {
+      const titleElement = document.getElementById('title');
+      const appElement = document.getElementById('app');
+      const calculatorSurface = document.querySelector('.rounded-2xl');
+      const display = document.getElementById('display');
+      const displayTime = document.getElementById('displayTime');
+      const displayMode = document.getElementById('displayMode');
+      const resultBox = document.querySelector('.result-box');
+      const numberButtons = document.querySelectorAll('.number-btn');
+      const operatorButtons = document.querySelectorAll('.operator-btn');
+      const specialButtons = document.querySelectorAll('.special-btn');
+      const equalsButton = document.querySelector('.equals-btn');
+      
+      const customFont = config.font_family || defaultConfig.font_family;
+      const baseFontSize = config.font_size || defaultConfig.font_size;
+      const fontStack = `${customFont}, system-ui, sans-serif`;
+      
+      titleElement.textContent = config.app_title || defaultConfig.app_title;
+      titleElement.style.fontFamily = fontStack;
+      titleElement.style.fontSize = `${baseFontSize * 1.8}px`;
+      titleElement.style.color = config.title_text_color || defaultConfig.title_text_color;
+      
+      appElement.style.background = config.background_color || defaultConfig.background_color;
+      
+      calculatorSurface.style.background = config.calculator_surface_color || defaultConfig.calculator_surface_color;
+      
+      display.style.background = config.display_color || defaultConfig.display_color;
+      display.style.color = config.display_text_color || defaultConfig.display_text_color;
+      
+      displayTime.style.fontFamily = fontStack;
+      displayTime.style.fontSize = `${baseFontSize * 2.2}px`;
+      displayTime.style.color = config.display_text_color || defaultConfig.display_text_color;
+      
+      displayMode.style.fontFamily = fontStack;
+      displayMode.style.fontSize = `${baseFontSize * 0.9}px`;
+      displayMode.style.color = config.display_text_color || defaultConfig.display_text_color;
+      
+      resultBox.style.background = config.display_color || defaultConfig.display_color;
+      resultBox.style.color = config.display_text_color || defaultConfig.display_text_color;
+      
+      const resultValue = document.getElementById('resultValue');
+      resultValue.style.fontFamily = fontStack;
+      resultValue.style.fontSize = `${baseFontSize * 1.4}px`;
+      
+      numberButtons.forEach(btn => {
+        btn.style.background = config.number_button_color || defaultConfig.number_button_color;
+        btn.style.color = config.number_button_text_color || defaultConfig.number_button_text_color;
+        btn.style.fontFamily = fontStack;
+        btn.style.fontSize = `${baseFontSize * 1.1}px`;
+      });
+      
+      operatorButtons.forEach(btn => {
+        btn.style.background = config.operator_button_color || defaultConfig.operator_button_color;
+        btn.style.color = config.operator_button_text_color || defaultConfig.operator_button_text_color;
+        btn.style.fontFamily = fontStack;
+        btn.style.fontSize = `${baseFontSize * 0.9}px`;
+      });
+      
+      specialButtons.forEach(btn => {
+        btn.style.background = config.special_button_color || defaultConfig.special_button_color;
+        btn.style.color = config.special_button_text_color || defaultConfig.special_button_text_color;
+        btn.style.fontFamily = fontStack;
+        btn.style.fontSize = `${baseFontSize * 1.1}px`;
+      });
+      
+      equalsButton.style.background = config.equals_button_color || defaultConfig.equals_button_color;
+      equalsButton.style.color = config.equals_button_text_color || defaultConfig.equals_button_text_color;
+      equalsButton.style.fontFamily = fontStack;
+      equalsButton.style.fontSize = `${baseFontSize * 0.9}px`;
+    }
+
+    if (window.elementSdk) {
+      window.elementSdk.init({
+        defaultConfig,
+        onConfigChange,
+        mapToCapabilities: (config) => ({
+          recolorables: [
+            {
+              get: () => config.background_color || defaultConfig.background_color,
+              set: (value) => {
+                window.elementSdk.config.background_color = value;
+                window.elementSdk.setConfig({ background_color: value });
+              }
+            },
+            {
+              get: () => config.calculator_surface_color || defaultConfig.calculator_surface_color,
+              set: (value) => {
+                window.elementSdk.config.calculator_surface_color = value;
+                window.elementSdk.setConfig({ calculator_surface_color: value });
+              }
+            },
+            {
+              get: () => config.number_button_color || defaultConfig.number_button_color,
+              set: (value) => {
+                window.elementSdk.config.number_button_color = value;
+                window.elementSdk.setConfig({ number_button_color: value });
+              }
+            },
+            {
+              get: () => config.operator_button_color || defaultConfig.operator_button_color,
+              set: (value) => {
+                window.elementSdk.config.operator_button_color = value;
+                window.elementSdk.setConfig({ operator_button_color: value });
+              }
+            },
+            {
+              get: () => config.equals_button_color || defaultConfig.equals_button_color,
+              set: (value) => {
+                window.elementSdk.config.equals_button_color = value;
+                window.elementSdk.setConfig({ equals_button_color: value });
+              }
+            }
+          ],
+          borderables: [],
+          fontEditable: {
+            get: () => config.font_family || defaultConfig.font_family,
+            set: (value) => {
+              window.elementSdk.config.font_family = value;
+              window.elementSdk.setConfig({ font_family: value });
+            }
+          },
+          fontSizeable: {
+            get: () => config.font_size || defaultConfig.font_size,
+            set: (value) => {
+              window.elementSdk.config.font_size = value;
+              window.elementSdk.setConfig({ font_size: value });
+            }
+          }
+        }),
+        mapToEditPanelValues: (config) => new Map([
+          ["app_title", config.app_title || defaultConfig.app_title]
+        ])
+      });
+    }
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9aa9ef6a447fd4a3',t:'MTc2NTE3MjUwMi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
